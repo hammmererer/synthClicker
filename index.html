@@ -14,18 +14,22 @@
 :root[data-theme="dark"]{--bg:#111;--fg:#eee;--muted:#999;--line:#444;--trace:#eee;--mark:#f55;--grid:#2a2a2a;color-scheme:dark}
 body{background:var(--bg);color:var(--fg);font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
 .wrap{max-width:900px;margin:0 auto;padding-inline:16px;padding-block:16px 32px}
-h1{font-size:1.3rem;margin:0 0 4px}
-.sub{color:var(--muted);margin:0 0 12px}
+h1{font-size:1.3rem;margin:0 0 12px}
+.sub{color:var(--muted);margin:8px 0 0;max-width:70ch}
 .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
 button,select,input[type=text]{font:inherit;padding:6px 10px}
 input[type=text]{min-width:0;width:12em}
 select{max-width:100%}
 button[aria-pressed="true"]{font-weight:700}
-.play{display:grid;grid-template-columns:1fr auto;gap:8px;margin:2px 0 10px}
-.click,.start{box-sizing:border-box;margin:0;min-height:76px;border-radius:12px;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
-.click{padding:18px 16px;font:700 1.6rem/1 system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--fg);color:var(--bg);border:1px solid var(--fg)}
-.start{min-width:5.6em;padding:18px 16px;font:700 1.15rem/1 system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--fg);border:1px solid var(--fg)}
+.play{display:grid;grid-template-columns:1fr auto;grid-template-areas:"click start" "rate start";gap:8px;align-items:stretch;margin:2px 0 10px}
+.click,.start{box-sizing:border-box;margin:0;border-radius:12px;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.click{grid-area:click;min-height:76px;padding:18px 16px;font:700 1.6rem/1 system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--fg);color:var(--bg);border:1px solid var(--fg)}
+.start{grid-area:start;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-width:7.4em;padding:14px 12px;background:var(--bg);color:var(--fg);border:1px solid var(--fg)}
+.start b{font:700 1.15rem/1.1 system-ui,-apple-system,"Segoe UI",sans-serif}
+.start small{font:500 .72rem/1.2 system-ui,-apple-system,"Segoe UI",sans-serif;opacity:.75}
+.start[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
 .click:active,.start:active{opacity:.72}
+.play .rate{grid-area:rate;margin:0;padding-right:16px}
 .presetpick{display:flex;margin:0 0 8px}
 .presetpick select{flex:1;min-width:0;max-width:none;padding:10px 12px;font-size:1rem}
 .rate{margin:0 0 12px}
@@ -81,11 +85,11 @@ textarea{width:100%;box-sizing:border-box;height:7em;font:12px var(--mono);margi
 
 <div class="wrap">
   <h1>Synthetic Clicker</h1>
-  <p class="sub">Synthetic echolocation clicks after Thaler et al. 2017, extended with ideas from Peter Blasser's click synth. Each slider moves several parameters at once.</p>
 
   <div class="play">
     <button id="one" class="click">Click</button>
-    <button id="run" class="start">Start</button>
+    <button id="run" class="start" aria-pressed="false"><b>Start</b><small>keeps clicking</small></button>
+    <div class="rate" id="rate"></div>
   </div>
   <div class="presetpick">
     <select id="preset" aria-label="Preset"></select>
@@ -97,7 +101,6 @@ textarea{width:100%;box-sizing:border-box;height:7em;font:12px var(--mono);margi
     <figure><figcaption><span id="specLbl">Spectrum</span><span id="peakLbl"></span></figcaption><canvas id="spec"></canvas></figure>
   </div>
 
-  <div class="rate" id="rate"></div>
   <div class="bar">
     <button id="range" aria-pressed="false">Range: Click</button>
     <button id="rand">Random</button>
@@ -128,6 +131,7 @@ textarea{width:100%;box-sizing:border-box;height:7em;font:12px var(--mono);margi
   </details>
 
   <p class="note">Animal presets are rough sketches from published descriptions, not measured fits. Ultrasonic animals (bats, porpoise, moths) are pitched down into the audible range, as on a time-expansion bat detector. Character blends between three click types loosely based on the paper's three echolocators. Saved presets live in this browser only; use "Move presets between devices" to carry them over. On iPhone, switch off silent mode. Space bar fires one group.</p>
+  <p class="sub">Synthetic echolocation clicks after Thaler et al. 2017, extended with ideas from Peter Blasser's click synth. Each slider moves several parameters at once.</p>
 </div>
 
 <script>
@@ -233,7 +237,7 @@ function check(parent,key,label){
 }
 function fmtMs(ms){return ms<1000?ms.toFixed(ms<10?1:0)+' ms':(ms/1000).toFixed(2)+' s'}
 const S=document.getElementById('sound'),F=document.getElementById('form'),Pl=document.getElementById('play'),R=document.getElementById('rate');
-row(R,'tempo','Rate',0,1,.001,v=>{const ms=TEMPO.to(v);return Math.round(ms)+' ms · '+(1000/ms).toFixed(1)+'/s'},'Time between clicks, or between groups');
+row(R,'tempo','Rate',0,1,.001,v=>{const ms=TEMPO.to(v);return Math.round(ms)+' ms · '+(1000/ms).toFixed(1)+'/s'});
 row(S,'charakter','Character',0,2,.01,v=>v<.5?'Type A (bright)':v<1.5?'Type B (dark)':'Type C (wide)','Blends frequencies, amplitudes and decay between three click types');
 row(S,'pitch','Pitch',-36,24,.1,v=>(v>0?'+':'')+(+v).toFixed(1)+' st','Moves all partials together, in semitones');
 row(S,'hell','Brightness',-1,1,.01,v=>v<-.2?'dull':v>.2?'sharp':'neutral','Tilts the spectrum towards low or high partials');
@@ -420,7 +424,10 @@ function tick(){
 }
 const runBtn=document.getElementById('run');
 runBtn.onclick=()=>{
-  ensure();running=!running;runBtn.textContent=running?'Stop':'Start';
+  ensure();running=!running;
+  runBtn.querySelector('b').textContent=running?'Stop':'Start';
+  runBtn.querySelector('small').textContent=running?'clicking now':'keeps clicking';
+  runBtn.setAttribute('aria-pressed',running);
   if(running){clickNo=0;grpIdx=0;nextT=ctx.currentTime+.05;tick();timer=setInterval(tick,25)}else clearInterval(timer);
 };
 function single(){
@@ -461,21 +468,28 @@ function drawWave(data,sr){
 }
 function drawSpec(data){
   const [c,w,h]=prep(document.getElementById('spec'));
-  const fmax=M.musical?2000:20000,bins=220,mags=[],L2=Math.min(data.length,8192);let mx=1e-12,pk=0;
-  document.getElementById('specLbl').textContent='Spectrum 0–'+(fmax/1000)+' kHz';
+  const fmax=M.musical?2000:20000,fmin=20,bins=220,mags=[],freqs=[],L2=Math.min(data.length,8192);
+  const logMin=Math.log(fmin),logSpan=Math.log(fmax/fmin),xOf=f=>(Math.log(f)-logMin)/logSpan*w;
+  let mx=1e-12,pk=fmin;
+  document.getElementById('specLbl').textContent='Spectrum '+fmin+' Hz–'+(fmax/1000)+' kHz';
   for(let b=0;b<bins;b++){
-    const f=(b+.5)/bins*fmax,wv=2*Math.PI*f/SRV;let re=0,im=0;
+    const f=Math.exp(logMin+(b+.5)/bins*logSpan),wv=2*Math.PI*f/SRV;let re=0,im=0;
     for(let n=0;n<L2;n++){re+=data[n]*Math.cos(wv*n);im-=data[n]*Math.sin(wv*n)}
-    const m=Math.hypot(re,im);mags.push(m);if(m>mx){mx=m;pk=f}
+    const m=Math.hypot(re,im);mags.push(m);freqs.push(f);if(m>mx){mx=m;pk=f}
   }
   const ph=h-14;
   c.strokeStyle=css('--grid');c.font='10px '+css('--mono');c.fillStyle=css('--muted');
-  for(let q=0;q<=4;q++){const x=q/4*w;c.beginPath();c.moveTo(x,0);c.lineTo(x,ph);c.stroke();if(q<4)c.fillText((fmax*q/4/1000)+'k',x+2,h-3)}
+  let lastX=-40;
+  for(let p=1;p<=4;p++)for(const mul of[1,2,5]){
+    const f=mul*10**p;if(f<=fmin*1.2||f>=fmax*.98)continue;
+    const x=xOf(f);c.beginPath();c.moveTo(x,0);c.lineTo(x,ph);c.stroke();
+    if(x-lastX>28&&x<w-22){c.fillText(f>=1000?(f/1000)+'k':String(f),x+2,h-3);lastX=x}
+  }
   for(const db of[-20,-40]){const y=-db/60*ph;c.beginPath();c.moveTo(0,y);c.lineTo(w,y);c.stroke();c.fillText(db+' dB',w-38,y-2)}
   c.beginPath();
-  mags.forEach((m,b)=>{const x=(b+.5)/bins*w,y=-Math.max(-60,20*Math.log10(m/mx))/60*ph;b?c.lineTo(x,y):c.moveTo(x,y)});
+  mags.forEach((m,b)=>{const x=xOf(freqs[b]),y=-Math.max(-60,20*Math.log10(m/mx))/60*ph;b?c.lineTo(x,y):c.moveTo(x,y)});
   c.strokeStyle=css('--trace');c.lineWidth=1.2;c.stroke();
-  c.fillStyle=css('--mark');c.beginPath();c.arc(pk/fmax*w,3,3,0,7);c.fill();
+  c.fillStyle=css('--mark');c.beginPath();c.arc(Math.min(w-3,Math.max(3,xOf(pk))),3,3,0,7);c.fill();
   document.getElementById('peakLbl').textContent='Peak '+(pk<1000?Math.round(pk)+' Hz':(pk/1000).toFixed(2)+' kHz');
 }
 let pending=false;
