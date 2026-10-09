@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Synthetic Clicker">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Synthetic Clicker</title>
+<style>
+:root{--bg:#fff;--fg:#111;--muted:#666;--line:#ccc;--trace:#111;--mark:#d00;--grid:#e6e6e6;--mono:ui-monospace,Menlo,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#111;--fg:#eee;--muted:#999;--line:#444;--trace:#eee;--mark:#f55;--grid:#2a2a2a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#111;--fg:#eee;--muted:#999;--line:#444;--trace:#eee;--mark:#f55;--grid:#2a2a2a;color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:900px;margin:0 auto;padding-inline:16px;padding-block:16px 32px}
+h1{font-size:1.3rem;margin:0 0 4px}
+.sub{color:var(--muted);margin:0 0 12px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+button,select,input[type=text]{font:inherit;padding:6px 10px}
+input[type=text]{min-width:0;width:12em}
+select{max-width:100%}
+button[aria-pressed="true"]{font-weight:700}
+.led{width:10px;height:10px;border-radius:50%;border:1px solid var(--line)}
+.led.on{background:var(--mark);border-color:var(--mark)}
+.scope{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:6px 0 16px}
+@media (max-width:700px){.scope{grid-template-columns:1fr}}
+figure{margin:0;min-width:0}
+figcaption{font-size:12px;color:var(--muted);display:flex;justify-content:space-between;margin-bottom:2px}
+canvas{width:100%;height:150px;display:block;border:1px solid var(--line)}
+fieldset{border:0;border-top:1px solid var(--line);margin:0 0 12px;padding:8px 0 0;min-width:0}
+legend{font-weight:600;padding:0 6px 0 0}
+.row{display:grid;grid-template-columns:7.5em 1fr 9em;gap:8px;align-items:center;margin:6px 0}
+.row output{font:12px var(--mono);text-align:right;font-variant-numeric:tabular-nums;color:var(--muted)}
+.row .hint{grid-column:2/4;font-size:12px;color:var(--muted);margin-top:-4px}
+.check{display:flex;gap:8px;align-items:center;margin:6px 0 6px 8.1em;font-size:13px}
+input[type=range]{width:100%}
+.status{font-size:12px;color:var(--muted)}
+.about{font-size:13px;color:var(--muted);margin:0 0 6px;max-width:70ch;min-height:1.4em}
+details{margin-top:4px}
+summary{cursor:pointer;color:var(--muted);font-size:13px}
+textarea{width:100%;box-sizing:border-box;height:7em;font:12px var(--mono);margin:6px 0}
+.note{color:var(--muted);font-size:13px;max-width:70ch;margin:12px 0 0}
+@media (max-width:480px){.row{grid-template-columns:6em 1fr 6.5em}.check{margin-left:0}}
+</style>
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <h1>Synthetic Clicker</h1>
+  <p class="sub">Synthetic echolocation clicks after Thaler et al. 2017, extended with ideas from Peter Blasser's click synth. Each slider moves several parameters at once.</p>
+
+  <div class="bar">
+    <button id="run">Start</button>
+    <button id="one">Single group</button>
+    <button id="range" aria-pressed="false">Range: Click</button>
+    <button id="rand">Random</button>
+    <span class="led" id="led" aria-hidden="true"></span>
+  </div>
+
+  <fieldset>
+    <legend>Presets</legend>
+    <div class="bar">
+      <select id="preset" aria-label="Preset"></select>
+      <button id="del">Delete</button>
+    </div>
+    <p class="about" id="about"></p>
+    <div class="bar">
+      <input type="text" id="pname" placeholder="Preset name" aria-label="Preset name">
+      <button id="save">Save current</button>
+      <span class="status" id="status"></span>
+    </div>
+    <details>
+      <summary>Move presets between devices</summary>
+      <textarea id="io" aria-label="Preset data" placeholder="Your saved presets as text. Copy them here, paste on another device, then press Import."></textarea>
+      <div class="bar">
+        <button id="exp">Copy my presets</button>
+        <button id="imp">Import</button>
+      </div>
+    </details>
+  </fieldset>
+
+  <div class="scope">
+    <figure><figcaption><span id="waveLbl">Waveform</span><span id="durLbl"></span></figcaption><canvas id="wave"></canvas></figure>
+    <figure><figcaption><span id="specLbl">Spectrum</span><span id="peakLbl"></span></figcaption><canvas id="spec"></canvas></figure>
+  </div>
+
+  <fieldset><legend>Sound</legend><div id="sound"></div></fieldset>
+  <fieldset><legend>Shape</legend><div id="form"></div></fieldset>
+  <fieldset><legend>Rhythm</legend><div id="play"></div></fieldset>
+
+  <p class="note">Animal presets are rough sketches from published descriptions, not measured fits. Ultrasonic animals (bats, porpoise, moths) are pitched down into the audible range, as on a time-expansion bat detector. Character blends between three click types loosely based on the paper's three echolocators. Saved presets live in this browser only; use "Move presets between devices" to carry them over. On iPhone, switch off silent mode. Space bar fires one group.</p>
+</div>
+
+<script>
+const TYPES=[
+  {freqs:[3390,5100,7000,9800,12000],mags:[1,.3,.2,.15,.08],tau:.8},
+  {freqs:[2400,7000,10500,14000,16000],mags:[1,.15,.12,.06,.02],tau:1.1},
+  {freqs:[3800,5000,7000,9800,11000],mags:[1,.15,.15,.25,.1],tau:.8}
+];
+// log slider helpers: value 0..1 <-> ms
+const logMap=(min,ratio)=>({to:v=>min*Math.pow(ratio,v),from:ms=>Math.log(ms/min)/Math.log(ratio)});
+const LEN=logMap(.1,20000),TEMPO=logMap(40,50),GAP=logMap(1,300),PGAP=logMap(.3,100);
+const L=LEN.from,T=TEMPO.from,G=GAP.from,P=PGAP.from;
+
+const DEF={charakter:0,pitch:0,hell:0,spread:1,noise:0,
+  laenge:L(.8),form:0,gleiten:0,gegen:false,ring:0,mp:0,mpgap:P(4),
+  tempo:T(526),burst:1,bgap:G(20),accel:0,unruhe:.25,dehnung:0,pegel:.6,musical:false};
+
+const BUILTIN=[
+ {group:'Human echolocators',items:{
+  'Human A (bright, EE1)':{p:{charakter:0,laenge:L(.8),tempo:T(526)},d:'Expert mouth click, peak around 3.4 kHz, energy up to ~12 kHz, about 3 ms long.'},
+  'Human B (dark, EE2)':{p:{charakter:1,laenge:L(1.1),tempo:T(738)},d:'Lower, more tonal click with a slower rate.'},
+  'Human C (wide, EE3)':{p:{charakter:2,laenge:L(.8),tempo:T(682),unruhe:.45},d:'Broad spectrum, more click-to-click variation.'}}},
+ {group:'Echolocating animals',items:{
+  'FM bat (pipistrelle, slowed)':{p:{pitch:5,spread:.25,hell:.3,laenge:L(1.6),form:.1,gleiten:-1.6,tempo:T(100),unruhe:.15},d:'Short downward frequency sweep. Real calls sweep roughly 80→45 kHz; here pitched down.'},
+  'CF bat (horseshoe, slowed)':{p:{pitch:2,spread:.03,hell:-.5,laenge:L(25),form:-.2,gleiten:-.25,tempo:T(120),unruhe:.1},d:'Long constant-frequency tone with a short downward tail, used to hear wingbeats of insects as Doppler flutter.'},
+  'Bat feeding buzz':{p:{pitch:8,spread:.25,hell:.3,laenge:L(.5),gleiten:-1.2,burst:16,bgap:G(6),accel:.3,tempo:T(400),unruhe:.15},d:'Final approach to prey: calls get shorter and faster, up to ~200 per second.'},
+  'Egyptian fruit bat (tongue clicks)':{p:{charakter:2,pitch:9,hell:.5,spread:1.3,laenge:L(.15),burst:2,bgap:G(22),tempo:T(110),unruhe:.25},d:'Very short broadband tongue clicks in pairs. Closest relative of the human mouth click.'},
+  'Swiftlet (double clicks)':{p:{charakter:1,pitch:-3,spread:1.1,hell:-.2,laenge:L(1.2),burst:2,bgap:G(15),tempo:T(160),unruhe:.3},d:'Cave swiftlets echolocate with audible double clicks, roughly 2–10 kHz.'},
+  'Oilbird (cave clicks)':{p:{charakter:1,pitch:-6,spread:.8,hell:-.6,laenge:L(1.5),burst:3,bgap:G(4),tempo:T(250),unruhe:.3,noise:.2},d:'Nocturnal cave bird; low audible clicks around 2 kHz, often in short bursts.'},
+  'Shrew twitter':{p:{pitch:10,spread:.15,hell:.2,laenge:L(3),gleiten:-.6,burst:4,bgap:G(25),tempo:T(300),unruhe:.5,noise:.25},d:'Quiet high twitters, thought to give shrews a simple close-range echo sense.'},
+  'Tenrec tongue clicks':{p:{charakter:2,pitch:-2,spread:1.2,laenge:L(.6),tempo:T(150),unruhe:.6,noise:.3},d:'Irregular tongue clicks of Madagascar tenrecs, used to orient at night.'},
+  'Dolphin click train':{p:{charakter:2,pitch:5,hell:.6,spread:1.4,laenge:L(.15),tempo:T(55),unruhe:.35},d:'Broadband sonar clicks well under a millisecond, in regular trains.'},
+  'Dolphin buzz':{p:{charakter:2,pitch:6,hell:.6,spread:1.4,laenge:L(.12),burst:16,bgap:G(3),accel:.15,tempo:T(300),unruhe:.25},d:'Click rate rises sharply when closing in on a fish.'},
+  'Harbour porpoise (slowed)':{p:{pitch:12,spread:.02,hell:-.6,laenge:L(1.2),form:-.3,burst:8,bgap:G(30),tempo:T(400),unruhe:.15},d:'Narrowband clicks near 130 kHz, almost a tiny tone burst. Pitched far down.'},
+  'Sperm whale click':{p:{charakter:1,pitch:-1,spread:1.2,hell:.1,laenge:L(.6),mp:.7,mpgap:P(4),tempo:T(800),unruhe:.1,noise:.25},d:'Each click is a decaying series of pulses a few ms apart, from sound bouncing inside the head.'},
+  'Sperm whale creak':{p:{charakter:1,pitch:-1,spread:1.2,hell:.1,laenge:L(.5),mp:.6,mpgap:P(4),burst:20,bgap:G(30),accel:.15,tempo:T(600),unruhe:.15,noise:.25},d:'Fast click series during the final approach to prey, like a creaking door.'},
+  'Sperm whale coda':{p:{charakter:1,pitch:-3,spread:1.2,laenge:L(.7),mp:.6,mpgap:P(4),burst:5,bgap:G(180),accel:.35,tempo:T(2000),unruhe:.1,noise:.25},d:'Social click rhythm; different groups use different coda patterns.'}}},
+ {group:'Insects against bats',items:{
+  'Tiger moth jamming (slowed)':{p:{charakter:2,pitch:6,spread:1.5,hell:.4,laenge:L(.3),noise:.4,burst:20,bgap:G(2),accel:-.15,tempo:T(120),unruhe:.4},d:'Some tiger moths answer an attacking bat with dense ultrasonic tymbal clicks that disrupt its sonar.'},
+  'Tiger moth warning (slowed)':{p:{charakter:2,pitch:4,spread:1.4,hell:.3,laenge:L(.4),noise:.35,burst:5,bgap:G(4),tempo:T(500),unruhe:.3},d:'Sparser click bursts that tell bats the moth tastes bad.'},
+  'Hawkmoth scrape (slowed)':{p:{charakter:2,pitch:8,spread:1.6,hell:.5,laenge:L(.2),noise:.85,burst:16,bgap:G(1.5),tempo:T(250),unruhe:.5},d:'Ultrasonic scraping produced by rubbing scales, also aimed at bats.'}}},
+ {group:'Other animal clickers',items:{
+  'Cicada tymbal':{p:{pitch:3,spread:.4,hell:-.2,laenge:L(3),form:.2,noise:.3,burst:24,bgap:G(4.5),tempo:T(40),unruhe:.2},d:'A buckling membrane (like a toy clicker) fired hundreds of times per second.'},
+  'Cricket chirp':{p:{charakter:1,pitch:11,spread:.02,hell:-.9,laenge:L(6),form:-.3,burst:4,bgap:G(35),tempo:T(450),unruhe:.1},d:'Almost pure tone pulses around 4.5 kHz, grouped into chirps.'},
+  'Snapping shrimp field':{p:{charakter:2,spread:1.5,hell:.5,laenge:L(.25),noise:.9,tempo:0,unruhe:1},d:'Collapsing cavitation bubbles; a colony sounds like frying bacon.'},
+  'Deathwatch beetle':{p:{charakter:1,pitch:-15,spread:1,hell:-.6,laenge:L(2),noise:.6,burst:8,bgap:G(85),tempo:T(1600),unruhe:.2},d:'Head-tapping on wood in short series.'},
+  'Woodpecker drum':{p:{charakter:1,pitch:-20,spread:1.2,hell:-.5,laenge:L(6),form:.2,noise:.5,burst:20,bgap:G(55),accel:.12,tempo:T(1800),unruhe:.15},d:'Rapid drumroll; the tree does most of the sounding.'}}},
+ {group:'Artistic',items:{
+  'Cricket clicker (two tones)':{p:{pitch:-5,spread:.35,hell:-.8,laenge:L(12),form:.2,tempo:T(900),unruhe:.1},d:'The toy/military tin clicker from the Blasser interview: a small resonant body with two tones.'},
+  'Orchestra in a millisecond':{p:{charakter:2,spread:1.6,hell:.2,laenge:L(1.5),form:.3,gleiten:1.2,gegen:true,ring:.6,tempo:T(800),unruhe:.3,dehnung:.6},d:'Blasser-style: counter-gliding partials, ring mod and stretched grains.'},
+  'Swelling grain':{p:{spread:1.2,laenge:L(40),form:-.85,gleiten:-.5,gegen:true,ring:.3,tempo:T(1400),unruhe:.2},d:'Long attack, abrupt end.'},
+  'Room exciter (long tail)':{p:{charakter:2,spread:1.3,hell:.1,laenge:L(300),form:.6,ring:.25,tempo:T(1800),unruhe:.15},d:'Long ringing click to wake up a space.'},
+  'Water drop':{p:{charakter:1,pitch:-14,spread:.1,hell:-.8,laenge:L(18),form:.1,gleiten:1.4,tempo:T(1100),unruhe:.3},d:'Upward-gliding tonal blip.'},
+  'Crawfish neuron (musical)':{p:{musical:true,pitch:-6,laenge:L(30),form:.2,gleiten:-.8,tempo:T(1500),unruhe:.3,dehnung:.5},d:'Musical range: each click becomes a pulse train.'}}}
+];
+const BUILTIN_MAP={};BUILTIN.forEach(g=>Object.assign(BUILTIN_MAP,g.items));
+
+const M={...DEF};
+const PATTERN=[0,.15,1,0,.45,0,.75,.1];
+let clickNo=0;
+const lerp=(a,b,t)=>a+(b-a)*t;
+
+function model(){
+  const c=Math.min(M.charakter,1.999),i=Math.floor(c),t=c-i,A=TYPES[i],B=TYPES[i+1];
+  const ps=Math.pow(2,M.pitch/12)/(M.musical?100:1);
+  let freqs=A.freqs.map((f,k)=>Math.exp(lerp(Math.log(f),Math.log(B.freqs[k]),t)));
+  let mags=A.mags.map((m,k)=>lerp(m,B.mags[k],t));
+  const f0=freqs[0];
+  freqs=freqs.map(f=>f0*Math.pow(f/f0,M.spread)*ps);
+  mags=mags.map((m,k)=>m*Math.pow(freqs[k]/freqs[0],M.hell*1.5));
+  let Tb=LEN.to(M.laenge)*lerp(A.tau,B.tau,t)/0.8;
+  if(M.musical)Tb=Math.min(Tb*20,4000);
+  const f=M.form,onset=0.03+Tb*0.12;
+  let att,dec,curve=1;
+  if(f>=0){att=onset;dec=Tb*(1+4*f)}
+  else{att=onset+Tb*6*(-f);dec=Tb*(1-.85*(-f));curve=1+2*(-f)}
+  // noise band centre: amplitude-weighted log mean of the partials, tilted by brightness
+  let ws=0,ls=0;freqs.forEach((fr,k)=>{ws+=mags[k];ls+=mags[k]*Math.log(fr)});
+  const nfc=Math.exp(ls/ws)*Math.pow(2,M.hell*1.5);
+  const nq=.6+Math.max(0,1-M.spread)*8;
+  const u=M.unruhe;
+  return {freqs,mags,att,dec,curve,nfc,nq,
+    fJit:.08*u,aJit:.7*u,phJit:Math.PI*u,iciJit:.45*u,
+    ici:TEMPO.to(M.tempo)};
+}
+
+// ---- UI ----
+const syncs=[];
+function row(parent,key,label,min,max,step,fmt,hint){
+  const id='m_'+key,d=document.createElement('div');d.className='row';
+  d.innerHTML=`<label for="${id}">${label}</label><input type="range" id="${id}" min="${min}" max="${max}" step="${step}"><output for="${id}"></output>`+(hint?`<div class="hint">${hint}</div>`:'');
+  parent.appendChild(d);
+  const inp=d.querySelector('input'),o=d.querySelector('output');
+  syncs.push(()=>{inp.value=M[key];o.textContent=fmt(M[key])});
+  inp.addEventListener('input',()=>{M[key]=+inp.value;edited();redraw()});
+}
+function check(parent,key,label){
+  const id='m_'+key,d=document.createElement('label');d.className='check';
+  d.innerHTML=`<input type="checkbox" id="${id}"> ${label}`;parent.appendChild(d);
+  const inp=d.querySelector('input');
+  syncs.push(()=>{inp.checked=M[key]});
+  inp.addEventListener('change',()=>{M[key]=inp.checked;edited();redraw()});
+}
+function fmtMs(ms){return ms<1000?ms.toFixed(ms<10?1:0)+' ms':(ms/1000).toFixed(2)+' s'}
+const S=document.getElementById('sound'),F=document.getElementById('form'),Pl=document.getElementById('play');
+row(S,'charakter','Character',0,2,.01,v=>v<.5?'Type A (bright)':v<1.5?'Type B (dark)':'Type C (wide)','Blends frequencies, amplitudes and decay between three click types');
+row(S,'pitch','Pitch',-36,24,.1,v=>(v>0?'+':'')+(+v).toFixed(1)+' st','Moves all partials together, in semitones');
+row(S,'hell','Brightness',-1,1,.01,v=>v<-.2?'dull':v>.2?'sharp':'neutral','Tilts the spectrum towards low or high partials');
+row(S,'spread','Spread',0,2,.01,v=>v<.15?'almost a tone':v<.85?'narrow':v<1.15?'natural':'wide','Spacing of the partials, from tonal to noisy');
+row(S,'noise','Noise',0,1,.01,v=>Math.round(v*100)+' %','Blends from partials to band-filtered noise: scrapes, snaps, wood');
+
+row(F,'laenge','Length',0,1,.001,()=>{const m=model();return fmtMs(m.att+3*m.dec)},'Slow motion: from 0.1 ms grain to several seconds of ringing');
+row(F,'form','Shape',-1,1,.01,v=>v<-.15?'long attack':v>.15?'long decay':'tight grain','One axis through three envelopes: swelling, grain, ringing out');
+row(F,'gleiten','Glide',-3,3,.01,v=>(v>0?'+':'')+(+v).toFixed(2)+' oct','Partials slide up or down during the click (FM sweep)');
+check(F,'gegen','Counter-motion: every second partial glides the other way');
+row(F,'ring','Ring mod',0,1,.01,v=>Math.round(v*100)+' %','Two groups of partials multiply: sum and difference tones instead of a plain mix');
+row(F,'mp','Multi-pulse',0,1,.01,v=>v<.01?'off':(1+Math.round(v*5))+' pulses','Repeats each click with falling level, like the sperm whale head echo');
+row(F,'mpgap','Pulse spacing',0,1,.001,v=>fmtMs(PGAP.to(v)),'Time between those pulses');
+
+row(Pl,'tempo','Tempo',0,1,.001,v=>{const ms=TEMPO.to(v);return Math.round(ms)+' ms · '+(1000/ms).toFixed(1)+'/s'},'Pause between clicks, or between groups when Group size is above 1');
+row(Pl,'burst','Group size',1,24,1,v=>v==1?'single clicks':v+' clicks','Clicks fired as a group: doubles, chirps, codas, buzzes');
+row(Pl,'bgap','Group spacing',0,1,.001,v=>fmtMs(GAP.to(v)),'Time between clicks inside a group');
+row(Pl,'accel','Accelerate',-1,1,.01,v=>Math.abs(v)<.03?'steady':v>0?'speeds up':'slows down','Intervals inside the group shrink or grow, like a buzz or a drumroll');
+row(Pl,'unruhe','Variation',0,1,.01,v=>Math.round(v*100)+' %','Click-to-click variation in timing, pitch, level and phase');
+row(Pl,'dehnung','Stretch',0,1,.01,v=>v<.01?'off':'up to ×'+Math.pow(2,v*4).toFixed(1),'Stretches some clicks in an 8-step pattern: some stay grains, others open up');
+row(Pl,'pegel','Level',0,1,.01,v=>Math.round(v*100)+' %');
+
+const rangeBtn=document.getElementById('range');
+function syncRange(){rangeBtn.textContent='Range: '+(M.musical?'Musical':'Click');rangeBtn.setAttribute('aria-pressed',M.musical)}
+rangeBtn.onclick=()=>{M.musical=!M.musical;edited();redraw()};
+document.getElementById('rand').onclick=()=>{
+  const r=Math.random;
+  Object.assign(M,{charakter:r()*2,pitch:Math.round((r()*2-1)*12),hell:r()*1.6-.8,spread:.3+r()*1.5,noise:r()<.6?0:r()*.8,
+    laenge:r()*.55,form:r()*2-1,gleiten:r()<.5?0:(r()*2-1)*2,gegen:r()<.5,ring:r()<.5?0:r(),
+    mp:r()<.7?0:r(),mpgap:r()*.6,burst:r()<.5?1:2+Math.floor(r()*10),bgap:r()*.7,accel:r()<.5?0:r()*.8-.4,
+    unruhe:r()*.6,dehnung:r()<.5?0:r()*.8});
+  edited();redraw();
+};
+
+// ---- Presets ----
+const KEY='echoklick.presets';
+const status=document.getElementById('status'),sel=document.getElementById('preset'),pname=document.getElementById('pname'),about=document.getElementById('about');
+function loadUser(){try{const v=JSON.parse(localStorage.getItem(KEY)||'{}');return v&&typeof v==='object'?v:{}}catch(e){return {}}}
+function storeUser(o){try{localStorage.setItem(KEY,JSON.stringify(o));return true}catch(e){return false}}
+let user=loadUser();
+const delBtn=document.getElementById('del');
+function fillSelect(selected){
+  sel.innerHTML='';
+  BUILTIN.forEach(g=>{
+    const og=document.createElement('optgroup');og.label=g.group;
+    for(const n in g.items)og.appendChild(new Option(n,'b:'+n));
+    sel.appendChild(og);
+  });
+  const names=Object.keys(user);
+  if(names.length){
+    const og=document.createElement('optgroup');og.label='My presets';
+    names.forEach(n=>og.appendChild(new Option(n,'u:'+n)));sel.appendChild(og);
+  }
+  const custom=new Option('(edited)','x');custom.hidden=true;sel.appendChild(custom);
+  sel.value=selected||'x';
+  delBtn.disabled=!sel.value.startsWith('u:');
+}
+function applyPreset(v){
+  const name=v.slice(2);
+  let src,desc='';
+  if(v.startsWith('b:')){const b=BUILTIN_MAP[name];if(!b)return;src=b.p;desc=b.d}
+  else{src=user[name];if(!src)return;pname.value=name;desc='Your preset.'}
+  Object.assign(M,DEF,src);clickNo=0;
+  about.textContent=desc;
+  delBtn.disabled=!v.startsWith('u:');
+  status.textContent='';redraw();
+}
+function edited(){if(sel.value!=='x'){sel.value='x';delBtn.disabled=true;about.textContent='Edited. Save it under a name to keep it.'}}
+sel.addEventListener('change',()=>applyPreset(sel.value));
+document.getElementById('save').onclick=()=>{
+  const n=pname.value.trim();
+  if(!n){status.textContent='Type a name first.';pname.focus();return}
+  const existed=n in user;
+  user[n]={...M};
+  status.textContent=storeUser(user)?(existed?'Updated “'+n+'”.':'Saved “'+n+'”.'):'Saved for this session only; this browser blocks storage.';
+  fillSelect('u:'+n);about.textContent='Your preset.';
+};
+let delArmed=false;
+delBtn.onclick=()=>{
+  if(!sel.value.startsWith('u:'))return;
+  const n=sel.value.slice(2);
+  if(!delArmed){delArmed=true;delBtn.textContent='Confirm delete';setTimeout(()=>{delArmed=false;delBtn.textContent='Delete'},3000);return}
+  delArmed=false;delBtn.textContent='Delete';
+  delete user[n];storeUser(user);status.textContent='Deleted “'+n+'”.';fillSelect();about.textContent='';
+};
+const io=document.getElementById('io');
+document.getElementById('exp').onclick=()=>{
+  io.value=JSON.stringify(user);
+  const fallback=()=>{io.select();status.textContent='Text selected, copy it manually.'};
+  try{navigator.clipboard.writeText(io.value).then(()=>status.textContent=Object.keys(user).length+' preset(s) copied.',fallback)}catch(e){fallback()}
+};
+document.getElementById('imp').onclick=()=>{
+  try{
+    const o=JSON.parse(io.value);let k=0;
+    for(const n in o)if(o[n]&&typeof o[n]==='object'){user[n]={...DEF,...o[n]};k++}
+    storeUser(user);fillSelect();status.textContent='Imported '+k+' preset(s).';
+  }catch(e){status.textContent='Could not read that text. Paste the exact text from “Copy my presets”.'}
+};
+
+// ---- Synthesis ----
+const rnd=a=>(Math.random()*2-1)*a;
+const PULSE_K=25,PULSE_DC=1/Math.sqrt(2*Math.PI*PULSE_K);
+function render(sr,jitter,stretch=1,maxSec=12){
+  const m=model(),a=m.att/1000*stretch,d=m.dec/1000*stretch,span=a+3*d;
+  const N=Math.min(Math.ceil((a+d*6.91)*sr)+2,Math.floor(maxSec*sr)),buf=new Float32Array(N),parts=[];
+  let magSum=0;
+  for(let k=0;k<5;k++){
+    let f=m.freqs[k],amp=m.mags[k],ph=0;
+    if(jitter){f*=1+rnd(m.fJit);amp*=Math.max(0,1+rnd(m.aJit));ph=rnd(m.phJit)}
+    const dir=(M.gegen&&k%2)?-1:1;
+    if(amp>0&&f>1&&f*Math.pow(2,Math.max(0,M.gleiten*dir))<sr/2-100){
+      parts.push({w:2*Math.PI*f/sr,amp,ph,dir,grp:k%2});magSum+=amp;
+    }
+  }
+  magSum=Math.max(magSum,1e-6);
+  // noise: biquad band-pass (0 dB peak)
+  const nz=M.noise;
+  let fc=Math.min(m.nfc*(jitter?1+rnd(m.fJit):1),sr*.45),Q=m.nq;
+  const w0=2*Math.PI*fc/sr,al=Math.sin(w0)/(2*Q),a0=1+al;
+  const b0=al/a0,b2=-al/a0,a1=-2*Math.cos(w0)/a0,a2=(1-al)/a0;
+  const bw=Math.min(1,(fc/Q)/(sr/2)),nScale=1/(3*.577*Math.sqrt(bw*1.57)+1e-6);
+  let x1=0,x2=0,y1=0,y2=0;
+  const g=M.gleiten,r=M.ring;let peak=1e-9;
+  for(let n=0;n<N;n++){
+    const t=n/sr,s=Math.min(1,t/span);
+    const env=t<a?Math.pow(t/a,m.curve):Math.exp(-(t-a)/d);
+    const gm=g?s*g:0;
+    let A=0,B=0;
+    for(const p of parts){
+      p.ph+=p.w*(gm?Math.pow(2,gm*p.dir):1);
+      const v=M.musical?(Math.exp(PULSE_K*(Math.cos(p.ph)-1))-PULSE_DC):Math.sin(p.ph);
+      if(p.grp)B+=p.amp*v;else A+=p.amp*v;
+    }
+    let tone=((1-r)*(A+B)+r*A*B*2)/magSum;
+    let y=tone;
+    if(nz>0){
+      const x=Math.random()*2-1,yn=b0*x+b2*x2-a1*y1-a2*y2;
+      x2=x1;x1=x;y2=y1;y1=yn;
+      y=(1-nz)*tone+nz*yn*nScale;
+    }
+    buf[n]=y*env;const ab=Math.abs(buf[n]);if(ab>peak)peak=ab;
+  }
+  const fade=Math.min(N,Math.floor(sr*.005));
+  for(let n=0;n<N;n++){buf[n]/=peak;if(n>=N-fade)buf[n]*=(N-n)/fade}
+  // multi-pulse: decaying copies of the click
+  if(M.mp>.01){
+    const cnt=1+Math.round(M.mp*5),dk=.3+.5*M.mp,sp=Math.max(1,Math.round(PGAP.to(M.mpgap)/1000*sr));
+    const out=new Float32Array(N+sp*(cnt-1));let pk=1e-9;
+    for(let k=0;k<cnt;k++){const gk=Math.pow(dk,k),off=k*sp;for(let n=0;n<N;n++)out[n+off]+=buf[n]*gk}
+    for(let n=0;n<out.length;n++)pk=Math.max(pk,Math.abs(out[n]));
+    for(let n=0;n<out.length;n++)out[n]/=pk;
+    return out;
+  }
+  return buf;
+}
+
+// ---- Audio & timing ----
+let ctx=null,master=null,running=false,nextT=0,timer=null,grpIdx=0;
+function ensure(){
+  if(!ctx){ctx=new (window.AudioContext||window.webkitAudioContext)();master=ctx.createGain();master.connect(ctx.destination)}
+  if(ctx.state==='suspended')ctx.resume();
+}
+const led=document.getElementById('led');
+function play(at){
+  const stretch=Math.pow(2,M.dehnung*4*PATTERN[clickNo++%PATTERN.length]);
+  const sr=ctx.sampleRate,data=render(sr,true,stretch);
+  const b=ctx.createBuffer(1,data.length,sr);b.copyToChannel(data,0);
+  const src=ctx.createBufferSource();src.buffer=b;
+  const g=ctx.createGain();g.gain.value=M.pegel;
+  src.connect(g).connect(master);src.start(at);
+  setTimeout(()=>{led.classList.add('on');drawWave(data,sr);setTimeout(()=>led.classList.remove('on'),40)},Math.max(0,(at-ctx.currentTime)*1000));
+}
+// interval after click number idx within a group (seconds)
+function inGroupGap(idx,jit){
+  const ms=GAP.to(M.bgap)*Math.pow(2,-M.accel*.3*idx);
+  return Math.max(.0007,ms/1000*Math.max(.2,1+rnd(jit*.5)));
+}
+function tick(){
+  while(nextT<ctx.currentTime+.12){
+    play(nextT);
+    const m=model();
+    if(grpIdx<M.burst-1){nextT+=inGroupGap(grpIdx,m.iciJit);grpIdx++}
+    else{grpIdx=0;nextT+=(m.ici/1000)*Math.max(.05,1+rnd(m.iciJit))}
+  }
+}
+const runBtn=document.getElementById('run');
+runBtn.onclick=()=>{
+  ensure();running=!running;runBtn.textContent=running?'Stop':'Start';
+  if(running){clickNo=0;grpIdx=0;nextT=ctx.currentTime+.05;tick();timer=setInterval(tick,25)}else clearInterval(timer);
+};
+function single(){
+  ensure();const m=model();let t=ctx.currentTime+.02;
+  for(let i=0;i<M.burst;i++){play(t);t+=inGroupGap(i,m.iciJit)}
+}
+document.getElementById('one').onclick=single;
+document.addEventListener('keydown',e=>{const tg=e.target;if(e.code==='Space'&&!['BUTTON','SELECT','TEXTAREA'].includes(tg.tagName)&&tg.type!=='checkbox'&&tg.type!=='text'){e.preventDefault();single()}});
+
+// ---- Display ----
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function prep(cv){
+  const r=cv.getBoundingClientRect(),dpr=window.devicePixelRatio||1;
+  cv.width=Math.max(1,r.width*dpr);cv.height=Math.max(1,r.height*dpr);
+  const c=cv.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);return [c,r.width,r.height];
+}
+function niceSpan(ms){const steps=[8,20,50,100,200,500,1000,2000,5000,10000,20000];return steps.find(s=>s>=ms)||ms}
+const SRV=48000;
+function drawWave(data,sr){
+  const [c,w,h]=prep(document.getElementById('wave'));
+  const totalMs=niceSpan(data.length/sr*1000*.9),px=w/(totalMs/1000*sr),ph=h-14,mid=ph/2;
+  document.getElementById('waveLbl').textContent='Waveform 0–'+fmtMs(totalMs);
+  c.strokeStyle=css('--grid');c.lineWidth=1;c.font='10px '+css('--mono');c.fillStyle=css('--muted');
+  for(let q=0;q<=4;q++){const x=q/4*w;c.beginPath();c.moveTo(x,0);c.lineTo(x,ph);c.stroke();if(q<4)c.fillText(fmtMs(totalMs*q/4),x+2,h-3)}
+  c.beginPath();c.moveTo(0,mid);c.lineTo(w,mid);c.stroke();
+  c.strokeStyle=css('--trace');c.lineWidth=1;c.beginPath();
+  const per=1/px;
+  if(per<=2){
+    for(let n=0;n<data.length&&n*px<=w;n++){const x=n*px,y=mid-data[n]*mid*.9;n?c.lineTo(x,y):c.moveTo(x,y)}
+  }else{
+    for(let x=0;x<w;x++){
+      const n0=Math.floor(x*per),n1=Math.min(data.length,Math.floor((x+1)*per));if(n0>=data.length)break;
+      let lo=1,hi=-1;for(let n=n0;n<n1;n++){const v=data[n];if(v<lo)lo=v;if(v>hi)hi=v}
+      c.moveTo(x+.5,mid-hi*mid*.9);c.lineTo(x+.5,mid-lo*mid*.9);
+    }
+  }
+  c.stroke();
+}
+function drawSpec(data){
+  const [c,w,h]=prep(document.getElementById('spec'));
+  const fmax=M.musical?2000:20000,bins=220,mags=[],L2=Math.min(data.length,8192);let mx=1e-12,pk=0;
+  document.getElementById('specLbl').textContent='Spectrum 0–'+(fmax/1000)+' kHz';
+  for(let b=0;b<bins;b++){
+    const f=(b+.5)/bins*fmax,wv=2*Math.PI*f/SRV;let re=0,im=0;
+    for(let n=0;n<L2;n++){re+=data[n]*Math.cos(wv*n);im-=data[n]*Math.sin(wv*n)}
+    const m=Math.hypot(re,im);mags.push(m);if(m>mx){mx=m;pk=f}
+  }
+  const ph=h-14;
+  c.strokeStyle=css('--grid');c.font='10px '+css('--mono');c.fillStyle=css('--muted');
+  for(let q=0;q<=4;q++){const x=q/4*w;c.beginPath();c.moveTo(x,0);c.lineTo(x,ph);c.stroke();if(q<4)c.fillText((fmax*q/4/1000)+'k',x+2,h-3)}
+  for(const db of[-20,-40]){const y=-db/60*ph;c.beginPath();c.moveTo(0,y);c.lineTo(w,y);c.stroke();c.fillText(db+' dB',w-38,y-2)}
+  c.beginPath();
+  mags.forEach((m,b)=>{const x=(b+.5)/bins*w,y=-Math.max(-60,20*Math.log10(m/mx))/60*ph;b?c.lineTo(x,y):c.moveTo(x,y)});
+  c.strokeStyle=css('--trace');c.lineWidth=1.2;c.stroke();
+  c.fillStyle=css('--mark');c.beginPath();c.arc(pk/fmax*w,3,3,0,7);c.fill();
+  document.getElementById('peakLbl').textContent='Peak '+(pk<1000?Math.round(pk)+' Hz':(pk/1000).toFixed(2)+' kHz');
+}
+let pending=false;
+function redraw(){
+  syncs.forEach(f=>f());syncRange();
+  const m=model();document.getElementById('durLbl').textContent='Click ≈ '+fmtMs(m.att+m.dec*3);
+  if(pending)return;pending=true;
+  requestAnimationFrame(()=>{pending=false;const d=render(SRV,false,1,3);drawWave(d,SRV);drawSpec(d)});
+}
+let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(redraw,100)});
+matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change',redraw);
+fillSelect('b:Human A (bright, EE1)');applyPreset(sel.value);
+</script>
+
+</body>
+</html>
