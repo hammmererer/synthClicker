@@ -21,6 +21,23 @@ button,select,input[type=text]{font:inherit;padding:6px 10px}
 input[type=text]{min-width:0;width:12em}
 select{max-width:100%}
 button[aria-pressed="true"]{font-weight:700}
+.play{display:grid;grid-template-columns:1fr auto;gap:8px;margin:2px 0 10px}
+.click,.start{box-sizing:border-box;margin:0;min-height:76px;border-radius:12px;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.click{padding:18px 16px;font:700 1.6rem/1 system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--fg);color:var(--bg);border:1px solid var(--fg)}
+.start{min-width:5.6em;padding:18px 16px;font:700 1.15rem/1 system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--fg);border:1px solid var(--fg)}
+.click:active,.start:active{opacity:.72}
+.presetpick{display:flex;margin:0 0 8px}
+.presetpick select{flex:1;min-width:0;max-width:none;padding:10px 12px;font-size:1rem}
+.rate{margin:0 0 12px}
+.rate .row{grid-template-columns:auto 1fr;grid-template-areas:"lab val" "sl sl" "hint hint";gap:2px 10px;margin:0}
+.rate .row label{grid-area:lab;font-weight:600}
+.rate .row output{grid-area:val;white-space:nowrap}
+.rate .row input[type=range]{grid-area:sl;-webkit-appearance:none;appearance:none;height:44px;margin:0;background:transparent}
+.rate .row input[type=range]::-webkit-slider-runnable-track{height:6px;background:var(--line);border-radius:3px}
+.rate .row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:32px;height:32px;margin-top:-13px;border-radius:50%;background:var(--fg);border:0}
+.rate .row input[type=range]::-moz-range-track{height:6px;background:var(--line);border-radius:3px;border:0}
+.rate .row input[type=range]::-moz-range-thumb{width:32px;height:32px;border-radius:50%;background:var(--fg);border:0}
+.rate .row .hint{grid-area:hint;grid-column:auto;margin:0}
 .led{width:10px;height:10px;border-radius:50%;border:1px solid var(--line)}
 .led.on{background:var(--mark);border-color:var(--mark)}
 .scope{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:6px 0 16px}
@@ -37,11 +54,25 @@ legend{font-weight:600;padding:0 6px 0 0}
 input[type=range]{width:100%}
 .status{font-size:12px;color:var(--muted)}
 .about{font-size:13px;color:var(--muted);margin:0 0 6px;max-width:70ch;min-height:1.4em}
-details{margin-top:4px}
-summary{cursor:pointer;color:var(--muted);font-size:13px}
+details.group{border-top:1px solid var(--line);margin:0}
+details.group[open]{padding-bottom:8px}
+details.group>summary{cursor:pointer;font-weight:600;font-size:1rem;color:var(--fg);padding:14px 0;list-style:none;display:flex;align-items:center;gap:8px}
+details.group>summary::-webkit-details-marker{display:none}
+details.group>summary::before{content:"▸";width:1em;color:var(--muted);font-size:.85em}
+details.group[open]>summary::before{content:"▾"}
+details.xfer{margin-top:4px}
+details.xfer summary{cursor:pointer;color:var(--muted);font-size:13px;font-weight:400;padding:0;display:list-item}
+details.xfer summary::before{content:none}
 textarea{width:100%;box-sizing:border-box;height:7em;font:12px var(--mono);margin:6px 0}
 .note{color:var(--muted);font-size:13px;max-width:70ch;margin:12px 0 0}
-@media (max-width:480px){.row{grid-template-columns:6em 1fr 6.5em}.check{margin-left:0}}
+@media (max-width:480px){
+  .row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"lab val" "sl sl" "hint hint";gap:2px 10px}
+  .row label{grid-area:lab}
+  .row input[type=range]{grid-area:sl;height:36px;min-width:0}
+  .row output{grid-area:val;white-space:nowrap}
+  .row .hint{grid-area:hint;grid-column:auto;margin-top:0}
+  .check{margin-left:0}
+}
 </style>
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
 </head>
@@ -52,27 +83,41 @@ textarea{width:100%;box-sizing:border-box;height:7em;font:12px var(--mono);margi
   <h1>Synthetic Clicker</h1>
   <p class="sub">Synthetic echolocation clicks after Thaler et al. 2017, extended with ideas from Peter Blasser's click synth. Each slider moves several parameters at once.</p>
 
+  <div class="play">
+    <button id="one" class="click">Click</button>
+    <button id="run" class="start">Start</button>
+  </div>
+  <div class="presetpick">
+    <select id="preset" aria-label="Preset"></select>
+  </div>
+  <p class="about" id="about"></p>
+
+  <div class="scope">
+    <figure><figcaption><span id="waveLbl">Waveform</span><span id="durLbl"></span></figcaption><canvas id="wave"></canvas></figure>
+    <figure><figcaption><span id="specLbl">Spectrum</span><span id="peakLbl"></span></figcaption><canvas id="spec"></canvas></figure>
+  </div>
+
+  <div class="rate" id="rate"></div>
   <div class="bar">
-    <button id="run">Start</button>
-    <button id="one">Single group</button>
     <button id="range" aria-pressed="false">Range: Click</button>
     <button id="rand">Random</button>
     <span class="led" id="led" aria-hidden="true"></span>
   </div>
 
-  <fieldset>
-    <legend>Presets</legend>
+  <details class="group"><summary>Sound</summary><div id="sound"></div></details>
+  <details class="group"><summary>Shape</summary><div id="form"></div></details>
+  <details class="group"><summary>Rhythm</summary><div id="play"></div></details>
+  <details class="group">
+    <summary>Presets</summary>
     <div class="bar">
-      <select id="preset" aria-label="Preset"></select>
       <button id="del">Delete</button>
     </div>
-    <p class="about" id="about"></p>
     <div class="bar">
       <input type="text" id="pname" placeholder="Preset name" aria-label="Preset name">
       <button id="save">Save current</button>
       <span class="status" id="status"></span>
     </div>
-    <details>
+    <details class="xfer">
       <summary>Move presets between devices</summary>
       <textarea id="io" aria-label="Preset data" placeholder="Your saved presets as text. Copy them here, paste on another device, then press Import."></textarea>
       <div class="bar">
@@ -80,16 +125,7 @@ textarea{width:100%;box-sizing:border-box;height:7em;font:12px var(--mono);margi
         <button id="imp">Import</button>
       </div>
     </details>
-  </fieldset>
-
-  <div class="scope">
-    <figure><figcaption><span id="waveLbl">Waveform</span><span id="durLbl"></span></figcaption><canvas id="wave"></canvas></figure>
-    <figure><figcaption><span id="specLbl">Spectrum</span><span id="peakLbl"></span></figcaption><canvas id="spec"></canvas></figure>
-  </div>
-
-  <fieldset><legend>Sound</legend><div id="sound"></div></fieldset>
-  <fieldset><legend>Shape</legend><div id="form"></div></fieldset>
-  <fieldset><legend>Rhythm</legend><div id="play"></div></fieldset>
+  </details>
 
   <p class="note">Animal presets are rough sketches from published descriptions, not measured fits. Ultrasonic animals (bats, porpoise, moths) are pitched down into the audible range, as on a time-expansion bat detector. Character blends between three click types loosely based on the paper's three echolocators. Saved presets live in this browser only; use "Move presets between devices" to carry them over. On iPhone, switch off silent mode. Space bar fires one group.</p>
 </div>
@@ -196,7 +232,8 @@ function check(parent,key,label){
   inp.addEventListener('change',()=>{M[key]=inp.checked;edited();redraw()});
 }
 function fmtMs(ms){return ms<1000?ms.toFixed(ms<10?1:0)+' ms':(ms/1000).toFixed(2)+' s'}
-const S=document.getElementById('sound'),F=document.getElementById('form'),Pl=document.getElementById('play');
+const S=document.getElementById('sound'),F=document.getElementById('form'),Pl=document.getElementById('play'),R=document.getElementById('rate');
+row(R,'tempo','Rate',0,1,.001,v=>{const ms=TEMPO.to(v);return Math.round(ms)+' ms · '+(1000/ms).toFixed(1)+'/s'},'Time between clicks, or between groups');
 row(S,'charakter','Character',0,2,.01,v=>v<.5?'Type A (bright)':v<1.5?'Type B (dark)':'Type C (wide)','Blends frequencies, amplitudes and decay between three click types');
 row(S,'pitch','Pitch',-36,24,.1,v=>(v>0?'+':'')+(+v).toFixed(1)+' st','Moves all partials together, in semitones');
 row(S,'hell','Brightness',-1,1,.01,v=>v<-.2?'dull':v>.2?'sharp':'neutral','Tilts the spectrum towards low or high partials');
@@ -211,7 +248,6 @@ row(F,'ring','Ring mod',0,1,.01,v=>Math.round(v*100)+' %','Two groups of partial
 row(F,'mp','Multi-pulse',0,1,.01,v=>v<.01?'off':(1+Math.round(v*5))+' pulses','Repeats each click with falling level, like the sperm whale head echo');
 row(F,'mpgap','Pulse spacing',0,1,.001,v=>fmtMs(PGAP.to(v)),'Time between those pulses');
 
-row(Pl,'tempo','Tempo',0,1,.001,v=>{const ms=TEMPO.to(v);return Math.round(ms)+' ms · '+(1000/ms).toFixed(1)+'/s'},'Pause between clicks, or between groups when Group size is above 1');
 row(Pl,'burst','Group size',1,24,1,v=>v==1?'single clicks':v+' clicks','Clicks fired as a group: doubles, chirps, codas, buzzes');
 row(Pl,'bgap','Group spacing',0,1,.001,v=>fmtMs(GAP.to(v)),'Time between clicks inside a group');
 row(Pl,'accel','Accelerate',-1,1,.01,v=>Math.abs(v)<.03?'steady':v>0?'speeds up':'slows down','Intervals inside the group shrink or grow, like a buzz or a drumroll');
